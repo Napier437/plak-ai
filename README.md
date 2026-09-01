@@ -2,6 +2,10 @@
 
 Plak! Ai: The first Alpha Version (v0.1.0-alpha)
 
+<p align="center">
+  <img src="logo.svg" alt="Plak! AI" width="350">
+</p>
+
 It's like a Jarvis, but—unlike other solutions—totally local (except STT, but we'll get to that later) and very optimized for regular PC users. You can run Plak AI using a GPU with just 4GB VRAM (e.g. GTX 1650). But as you know, that comes with a cost.
 
 Plak AI uses Gemma 3 : 4B on the backend via Ollama. Yes, it might not seem that capable or scholarly at first, but let me remind you: we only have 4GB VRAM to work with (at least the project is very ambitious regarding optimization). Even so, Gemma 3 : 4B is great under these conditions. Let me explain:
