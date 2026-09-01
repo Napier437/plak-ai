@@ -3,7 +3,7 @@
 Plak! Ai: The first Alpha Version (v0.1.0-alpha)
 
 <p align="center">
-  <img src="Plak! Ai logo1" alt="Plak! AI" width="350">
+  <img src="Plak! Ai logo1.svg" alt="Plak! AI" width="350">
 </p>
 
 It's like a Jarvis, but—unlike other solutions—totally local (except STT, but we'll get to that later) and very optimized for regular PC users. You can run Plak AI using a GPU with just 4GB VRAM (e.g. GTX 1650). But as you know, that comes with a cost.
