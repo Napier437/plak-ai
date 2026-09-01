@@ -28,7 +28,32 @@ ApplicationWindow {
     property int ttsModu: 0
     property string aktifSohbetBaslik: "Sohbet 1"
     property int aktifSohbetIndex: 0
+    // HER SOHBETİN MESAJLARINI AYRI SAKLAYAN HAFIZA
+    property var tumSohbetlerHafizasi: ({
+        "Sohbet 1": [
+            { "gonderen": "asistan", "mesaj": "Merhaba! Size nasıl yardımcı olabilirim?" }
+        ]
+    })
 
+    function sohbetYukle(baslik) {
+        chatModeli.clear()
+        if (!tumSohbetlerHafizasi[baslik]) {
+            tumSohbetlerHafizasi[baslik] = [
+                { "gonderen": "asistan", "mesaj": "Yeni oturum hazır. Dinliyorum!" }
+            ]
+        }
+        var liste = tumSohbetlerHafizasi[baslik]
+        for (var i = 0; i < liste.length; i++) {
+            chatModeli.append(liste[i])
+        }
+    }
+
+    function sohbeteMesajKaydet(baslik, gonderen, mesaj) {
+        if (!tumSohbetlerHafizasi[baslik]) {
+            tumSohbetlerHafizasi[baslik] = []
+        }
+        tumSohbetlerHafizasi[baslik].push({ "gonderen": gonderen, "mesaj": mesaj })
+    }
     ListModel {
         id: sohbetGecmisModeli
         ListElement { baslik: "Sohbet 1" }
@@ -166,9 +191,9 @@ ApplicationWindow {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 8
 
-            // 1. STT BUTONU
+// 1. STT BUTONU (ONLINE / OFFLINE)
             Rectangle {
-                width: 85
+                width: 90
                 height: 24
                 radius: 12
                 color: asistan.onlineMod ? "#10b981" : "#334155"
@@ -192,10 +217,11 @@ ApplicationWindow {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: asistan.onlineMod = !asistan.onlineMod
+                    onClicked: {
+                        asistan.onlineMod = !asistan.onlineMod
+                    }
                 }
             }
-
             // 2. 3 KADEMELİ TTS BUTONU (PIPER -> META -> SESSİZ)
             Rectangle {
                 width: 85
@@ -583,28 +609,103 @@ ApplicationWindow {
 
                 Column {
                     anchors.fill: parent
-                    anchors.margins: 14
-                    spacing: 10
+                    anchors.margins: 12
+                    spacing: 8
 
+                    // BAŞLIK VE ETKİNLİK OLUŞTUR BUTONU
                     Row {
-                        spacing: 8
-                        Text { text: "📅"; font.pixelSize: 12 }
-                        Text {
-                            text: "ETKİNLİKLER & GÜNDEM"
-                            color: "#38bdf8"
-                            font.bold: true
-                            font.pixelSize: 11
-                            font.family: "Segoe UI"
-                            font.letterSpacing: 1.0
+                        width: parent.width
+                        height: 24
+
+                        Row {
+                            spacing: 6
+                            anchors.verticalCenter: parent.verticalCenter
+                            Text { text: "📅"; font.pixelSize: 12 }
+                            Text {
+                                text: "ETKİNLİKLER"
+                                color: "#38bdf8"
+                                font.bold: true
+                                font.pixelSize: 11
+                                font.family: "Segoe UI"
+                            }
+                        }
+
+                        Item { width: parent.width - 170; height: 1 }
+
+                        Rectangle {
+                            width: 78
+                            height: 22
+                            radius: 4
+                            color: newEtkHov.containsMouse ? "#0284c7" : Qt.rgba(0.02, 0.52, 0.78, 0.3)
+                            border.color: "#38bdf8"
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            Text {
+                                text: "+ Etkinlik"
+                                color: "#ffffff"
+                                font.pixelSize: 9
+                                font.bold: true
+                                anchors.centerIn: parent
+                            }
+
+                            MouseArea {
+                                id: newEtkHov
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: hatirlaticiEkleModal.open()
+                            }
                         }
                     }
 
                     Rectangle { width: parent.width; height: 1; color: Qt.rgba(1, 1, 1, 0.15) }
 
-                    // CANLI MİNİ TAKVİM WIDGET'I
+                    // GERÇEK EKLENEN ETKİNLİKLER LİSTESİ
+                    ScrollView {
+                        width: parent.width
+                        height: 75
+                        clip: true
+
+                        ListView {
+                            width: parent.width
+                            spacing: 4
+                            model: hatirlaticiModeli
+                            delegate: Rectangle {
+                                width: parent.width - 4
+                                height: 24
+                                radius: 4
+                                color: Qt.rgba(1, 1, 1, 0.06)
+
+                                Row {
+                                    anchors.fill: parent
+                                    anchors.margins: 4
+                                    spacing: 6
+                                    Text { text: "📌"; font.pixelSize: 8; anchors.verticalCenter: parent.verticalCenter }
+                                    Text { 
+                                        text: model.baslik
+                                        color: "#ffffff"
+                                        font.pixelSize: 9
+                                        font.family: "Segoe UI"
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        elide: Text.ElideRight
+                                        width: 140
+                                    }
+                                    Text {
+                                        text: model.saat ? model.saat : model.tarih
+                                        color: "#38bdf8"
+                                        font.pixelSize: 8
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 4
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // CANLI MİNİ TAKVİM
                     Rectangle {
                         width: parent.width
-                        height: parent.height - 45
+                        height: parent.height - 125
                         radius: 8
                         color: Qt.rgba(0, 0, 0, 0.45)
                         border.color: Qt.rgba(1, 1, 1, 0.15)
@@ -830,11 +931,10 @@ ApplicationWindow {
                     }
                 }
             }
-
-            // SOHBET GEÇMİŞİ (DİNAMİK LİSTE VE + YENİ SOHBET BUTONU)
+// SOHBET GEÇMİŞİ (DİNAMİK LİSTE VE + YENİ SOHBET BUTONU)
             Rectangle {
                 width: parent.width
-                height: parent.height - 325
+                height: Math.max(120, parent.height - 180 - 120 - 48) // 180 (Metrikler) + 120 (Saat) + Spacing/Margin toplamı
                 radius: 12
                 color: Qt.rgba(0.04, 0.06, 0.09, 0.82)
                 border.color: Qt.rgba(1, 1, 1, 0.25)
@@ -842,26 +942,36 @@ ApplicationWindow {
 
                 Column {
                     anchors.fill: parent
-                    anchors.margins: 12
+                    anchors.margins: 10
                     spacing: 8
 
+                    // Başlık ve Buton Satırı
                     Row {
                         width: parent.width
+                        height: 24
+
                         Text {
                             text: "SOHBET GEÇMİŞİ"
                             color: "#ffffff"
                             font.bold: true
                             font.pixelSize: 11
                             font.family: "Segoe UI"
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        // Sağa yaslamak için araya esnek boşluk
+                        Item {
+                            width: parent.width - 95 - 85 // Başlık genişliği ve buton payı
+                            height: 1
                         }
 
                         Rectangle {
-                            width: 78
-                            height: 20
+                            width: 82
+                            height: 22
                             radius: 4
-                            color: newChatHov.containsMouse ? "#0284c7" : Qt.rgba(1, 1, 1, 0.12)
+                            color: newChatHov.containsMouse ? "#0284c7" : Qt.rgba(1, 1, 1, 0.15)
                             border.color: "#38bdf8"
-                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
 
                             Text {
                                 text: "+ Yeni Sohbet"
@@ -881,17 +991,22 @@ ApplicationWindow {
                                     sohbetGecmisModeli.append({ "baslik": yeniBaslik })
                                     anaPencere.aktifSohbetBaslik = yeniBaslik
                                     anaPencere.aktifSohbetIndex = sohbetGecmisModeli.count - 1
-                                    chatModeli.clear()
-                                    chatModeli.append({ "gonderen": "asistan", "mesaj": "Yeni oturum başlatıldı. Size nasıl yardımcı olabilirim?" })
+                                    
+                                    // Yeni sohbeti bağımsız hafızayla başlat
+                                    tumSohbetlerHafizasi[yeniBaslik] = [
+                                        { "gonderen": "asistan", "mesaj": "Yeni oturum hazır. Dinliyorum!" }
+                                    ]
+                                    sohbetYukle(yeniBaslik)
                                     anaPencere.aktifSekme = "Sohbet"
                                 }
                             }
                         }
                     }
 
+                    // Liste Alanı
                     ScrollView {
                         width: parent.width
-                        height: parent.height - 32
+                        height: parent.height - 36
                         clip: true
 
                         ListView {
@@ -899,7 +1014,7 @@ ApplicationWindow {
                             spacing: 6
                             model: sohbetGecmisModeli
                             delegate: Rectangle {
-                                width: parent.width - 8
+                                width: parent.width - 6
                                 height: 32
                                 radius: 5
                                 color: (anaPencere.aktifSohbetIndex === index) ? Qt.rgba(0.02, 0.52, 0.78, 0.35) : (chatItemHov.containsMouse ? Qt.rgba(1, 1, 1, 0.1) : Qt.rgba(1, 1, 1, 0.05))
@@ -922,6 +1037,7 @@ ApplicationWindow {
                                     onClicked: {
                                         anaPencere.aktifSohbetBaslik = model.baslik
                                         anaPencere.aktifSohbetIndex = index
+                                        sohbetYukle(model.baslik) // Seçilen sohbetin geçmişini yükler
                                         anaPencere.aktifSekme = "Sohbet"
                                     }
                                 }
@@ -999,7 +1115,6 @@ ApplicationWindow {
                     }
                 }
             }
-
             Item {
                 anchors.fill: parent
                 anchors.bottomMargin: 14
@@ -2497,6 +2612,11 @@ ApplicationWindow {
             var metin = girdiKutusu.text.trim()
             girdiKutusu.text = ""
             anaPencere.konusuyorMu = true
+            
+            chatModeli.append({ "gonderen": "kullanici", "mesaj": metin })
+            sohbeteMesajKaydet(anaPencere.aktifSohbetBaslik, "kullanici", metin)
+            chatListView.positionViewAtEnd()
+            
             asistan.mesajGonder(metin)
         }
     }
@@ -2507,15 +2627,21 @@ ApplicationWindow {
         function onYeniMesajEkle(rol, metin) {
             var gonderenRol = (rol === "user" || rol === "kullanici") ? "kullanici" : "asistan"
             chatModeli.append({ "gonderen": gonderenRol, "mesaj": metin })
+            sohbeteMesajKaydet(anaPencere.aktifSohbetBaslik, gonderenRol, metin)
             chatListView.positionViewAtEnd()
         }
 
         function onMesajGuncelle(metin) {
             if (chatModeli.count > 0) {
                 chatModeli.setProperty(chatModeli.count - 1, "mesaj", metin)
+                var aktifDizi = tumSohbetlerHafizasi[anaPencere.aktifSohbetBaslik]
+                if (aktifDizi && aktifDizi.length > 0) {
+                    aktifDizi[aktifDizi.length - 1].mesaj = metin
+                }
                 chatListView.positionViewAtEnd()
             }
         }
+
 
         function onDurumDegisti(durum) {
             if (durum === "dinliyor") {
