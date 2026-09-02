@@ -64,7 +64,50 @@ ApplicationWindow {
         ListElement { baslik: "Asistan Ses Testi"; tarih: "01.09.2026"; saat: "17:00" }
         ListElement { baslik: "Modülleri Derle"; tarih: "02.09.2026"; saat: "15:30" }
     }
+    ListModel {
+        id: metrikModeli
+        ListElement { label: "NEURAL ENGINE (LLM)"; val: 0.45; col: "#00d2ff" }
+        ListElement { label: "GPU VRAM USAGE"; val: 0.30; col: "#22c55e" }
+        ListElement { label: "AUDIO BUFFER (I/O)"; val: 0.20; col: "#eab308" }
+        ListElement { label: "SYSTEM THREADS"; val: 0.15; col: "#ef4444" }
+    }
 
+    Repeater {
+        model: metrikModeli
+
+        Column {
+            spacing: 3
+            Text {
+                text: model.label
+                color: "#94a3b8"
+                font.pixelSize: 9
+                font.bold: true
+            }
+            Rectangle {
+                width: 170
+                height: 8
+                radius: 4
+                color: "#030712"
+
+                Rectangle {
+                    id: barIci
+                    width: Math.max(8, parent.width * Math.min(1.0, Math.max(0.05, model.val)))
+                    height: parent.height
+                    radius: 4
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop { position: 0.0; color: Qt.darker(model.col, 1.3) }
+                        GradientStop { position: 1.0; color: model.col }
+                    }
+
+                    // Çubukların kayarak oynamasını sağlayan animasyon:
+                    Behavior on width {
+                        NumberAnimation { duration: 400; easing.type: Easing.OutQuad }
+                    }
+                }
+            }
+        }
+    }
     Timer {
         id: aiCevapZamanlayici
         interval: 7000
@@ -702,65 +745,120 @@ ApplicationWindow {
                         }
                     }
 
-                    // CANLI MİNİ TAKVİM
-                    Rectangle {
-                        width: parent.width
-                        height: parent.height - 125
-                        radius: 8
-                        color: Qt.rgba(0, 0, 0, 0.45)
-                        border.color: Qt.rgba(1, 1, 1, 0.15)
+ // CANLI VE GEZİLEBİLİR TAKVİM WIDGET'I
+                Rectangle {
+                    id: takvimKutusu
+                    width: parent.width
+                    height: parent.height - 135
+                    radius: 8
+                    color: Qt.rgba(0, 0, 0, 0.45)
+                    border.color: Qt.rgba(1, 1, 1, 0.15)
 
-                        Column {
-                            anchors.fill: parent
-                            anchors.margins: 8
-                            spacing: 4
+                    property date goruntulenenTarih: new Date()
+
+                    function ayGuncelle(fark) {
+                        var y = goruntulenenTarih.getFullYear()
+                        var m = goruntulenenTarih.getMonth() + fark
+                        goruntulenenTarih = new Date(y, m, 1)
+                    }
+
+                    function ayinSonGunu() {
+                        return new Date(goruntulenenTarih.getFullYear(), goruntulenenTarih.getMonth() + 1, 0).getDate()
+                    }
+
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 6
+                        spacing: 4
+
+                        // AY / YIL VE DEĞİŞTİRME BUTONLARI
+                        Row {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            spacing: 14
 
                             Text {
-                                text: Qt.formatDate(girisGörünüm.suAn, "MMMM yyyy").toUpperCase()
-                                color: "#38bdf8"
-                                font.bold: true
-                                font.pixelSize: 10
-                                font.family: "Segoe UI"
-                                anchors.horizontalCenter: parent.horizontalCenter
-                            }
-
-                            Row {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                spacing: 14
-                                Repeater {
-                                    model: ["Pt", "Sa", "Ça", "Pe", "Cu", "Ct", "Pz"]
-                                    Text { text: modelData; color: "#94a3b8"; font.pixelSize: 9; font.bold: true }
+                                text: "◀"
+                                color: "#94a3b8"
+                                font.pixelSize: 9
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: takvimKutusu.ayGuncelle(-1)
                                 }
                             }
 
-                            Grid {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                columns: 7
-                                spacing: 12
+                            Text {
+                                text: Qt.formatDate(takvimKutusu.goruntulenenTarih, "MMMM yyyy").toUpperCase()
+                                color: "#38bdf8"
+                                font.bold: true
+                                font.pixelSize: 9
+                                font.family: "Segoe UI"
+                            }
 
-                                Repeater {
-                                    model: 31
-                                    Rectangle {
-                                        width: 14
-                                        height: 14
-                                        radius: 3
-                                        property bool bugunMu: (index + 1) === girisGörünüm.suAn.getDate()
-                                        color: bugunMu ? "#0284c7" : "transparent"
-                                        border.color: bugunMu ? "#38bdf8" : "transparent"
+                            Text {
+                                text: "▶"
+                                color: "#94a3b8"
+                                font.pixelSize: 9
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: takvimKutusu.ayGuncelle(1)
+                                }
+                            }
+                        }
 
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: index + 1
-                                            color: parent.bugunMu ? "#ffffff" : "#cbd5e1"
-                                            font.pixelSize: 8
-                                            font.bold: parent.bugunMu
+                        Row {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            spacing: 14
+                            Repeater {
+                                model: ["Pt", "Sa", "Ça", "Pe", "Cu", "Ct", "Pz"]
+                                Text { text: modelData; color: "#94a3b8"; font.pixelSize: 8; font.bold: true }
+                            }
+                        }
+
+                        Grid {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            columns: 7
+                            spacing: 8
+
+                            Repeater {
+                                model: takvimKutusu.ayinSonGunu()
+                                Rectangle {
+                                    width: 14
+                                    height: 12
+                                    radius: 2
+                                    property bool bugunMu: (index + 1) === new Date().getDate() && 
+                                                            takvimKutusu.goruntulenenTarih.getMonth() === new Date().getMonth() && 
+                                                            takvimKutusu.goruntulenenTarih.getFullYear() === new Date().getFullYear()
+
+                                    color: bugunMu ? "#0284c7" : (gHov.containsMouse ? Qt.rgba(1,1,1,0.2) : "transparent")
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: index + 1
+                                        color: parent.bugunMu ? "#ffffff" : "#cbd5e1"
+                                        font.pixelSize: 8
+                                    }
+
+                                        MouseArea {
+                                            id: gHov
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                var gun = (index + 1) < 10 ? "0" + (index + 1) : (index + 1)
+                                                var ay = (takvimKutusu.goruntulenenTarih.getMonth() + 1) < 10 ? "0" + (takvimKutusu.goruntulenenTarih.getMonth() + 1) : (takvimKutusu.goruntulenenTarih.getMonth() + 1)
+                                                var yil = takvimKutusu.goruntulenenTarih.getFullYear()
+                                                modalTarihGirdi.text = gun + "." + ay + "." + yil
+                                                hatirlaticiEkleModal.open()
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                }
+                    } // takvimKutusu bitti
+                } // Sağ üst kart iç Column bitti
             }
 
             // SAĞ ALT: CURRENCYLER (PİYASA & DÖVİZ KURLARI)
@@ -1509,88 +1607,136 @@ ApplicationWindow {
             }
 
             // HATIRLATICILAR (DİNAMİK LİSTE VE + EKLE BUTONU)
-            Rectangle {
-                width: parent.width
-                height: parent.height * 0.43
-                radius: 12
-                color: Qt.rgba(0.04, 0.06, 0.09, 0.82)
-                border.color: Qt.rgba(1, 1, 1, 0.25)
-                clip: true
+// SAĞ ALT: CANLI ETKİNLİKLER VE + ETKİNLİK EKLE BUTONU
+        Rectangle {
+            width: parent.width
+            height: parent.height * 0.45
+            radius: 12
+            color: Qt.rgba(0.04, 0.06, 0.09, 0.82)
+            border.color: Qt.rgba(1, 1, 1, 0.25)
+            clip: true
 
-                Column {
-                    anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 8
+            Column {
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 6
+
+                // BAŞLIK SATIRI (Row yerine Item kullandık, taşma/çakışma bitti)
+                Item {
+                    width: parent.width
+                    height: 22
 
                     Row {
-                        width: parent.width
-                        Text {
-                            text: "HATIRLATICILAR"
-                            color: "#ffffff"
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 6
+                        Text { text: "📅"; font.pixelSize: 10 }
+                        Text { 
+                            text: "ETKİNLİKLER"
+                            color: "#38bdf8"
                             font.bold: true
-                            font.pixelSize: 11
-                            font.family: "Segoe UI"
-                        }
-
-                        Rectangle {
-                            width: 55
-                            height: 18
-                            radius: 4
-                            color: "#0284c7"
-                            anchors.right: parent.right
-
-                            Text {
-                                text: "+ Ekle"
-                                color: "#ffffff"
-                                font.pixelSize: 9
-                                font.bold: true
-                                anchors.centerIn: parent
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: hatirlaticiEkleModal.open()
-                            }
+                            font.pixelSize: 10
+                            font.family: "Segoe UI" 
                         }
                     }
 
-                    ScrollView {
-                        width: parent.width
-                        height: parent.height - 30
-                        clip: true
+                    Rectangle {
+                        width: 68
+                        height: 20
+                        radius: 4
+                        color: etkHovAI.containsMouse ? "#0284c7" : Qt.rgba(1, 1, 1, 0.15)
+                        border.color: "#38bdf8"
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
 
-                        ListView {
-                            width: parent.width
-                            spacing: 6
-                            model: hatirlaticiModeli
-                            delegate: Rectangle {
-                                width: parent.width - 4
-                                height: 32
-                                radius: 5
-                                color: Qt.rgba(1, 1, 1, 0.06)
-                                Row {
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: 8
+                        Text {
+                            text: "+ Etkinlik"
+                            color: "#ffffff"
+                            font.pixelSize: 9
+                            font.bold: true
+                            anchors.centerIn: parent
+                        }
+
+                        MouseArea {
+                            id: etkHovAI
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: hatirlaticiEkleModal.open()
+                        }
+                    }
+                }
+
+                Rectangle { width: parent.width; height: 1; color: Qt.rgba(1, 1, 1, 0.1) }
+
+                ScrollView {
+                    width: parent.width
+                    height: parent.height - 35
+                    clip: true
+
+                    ListView {
+                        width: parent.width
+                        spacing: 4
+                        model: hatirlaticiModeli
+                        delegate: Rectangle {
+                            width: parent.width - 4
+                            height: model.aciklama ? 38 : 28
+                            radius: 4
+                            color: Qt.rgba(1, 1, 1, 0.05)
+
+                            Row {
+                                anchors.fill: parent
+                                anchors.margins: 4
+                                spacing: 6
+
+                                Text { text: "📌"; font.pixelSize: 9; anchors.verticalCenter: parent.verticalCenter }
+
+                                Column {
+                                    width: parent.width - 100
                                     anchors.verticalCenter: parent.verticalCenter
-                                    spacing: 8
-                                    Text { text: "📌"; font.pixelSize: 10 }
-                                    Text { text: model.baslik; color: "#cbd5e1"; font.pixelSize: 10; font.family: "Segoe UI" }
+                                    spacing: 1
+
                                     Text {
-                                        text: model.saat ? model.saat : model.tarih
+                                        text: model.baslik
+                                        color: "#ffffff"
+                                        font.pixelSize: 10
+                                        font.family: "Segoe UI"
+                                        elide: Text.ElideRight
+                                        width: parent.width
+                                    }
+                                    Text {
+                                        text: model.aciklama ? model.aciklama : ""
                                         color: "#94a3b8"
+                                        font.pixelSize: 8
+                                        font.family: "Segoe UI"
+                                        visible: Boolean(model.aciklama)
+                                        elide: Text.ElideRight
+                                        width: parent.width
+                                    }
+                                }
+
+                                    Text {
+                                        text: "✕"
+                                        color: delHov.containsMouse ? "#ef4444" : "#64748b"
                                         font.pixelSize: 9
-                                        anchors.right: parent.right
-                                        anchors.rightMargin: 8
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        MouseArea {
+                                            id: delHov
+                                            anchors.fill: parent
+                                            anchors.margins: -4
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: hatirlaticiModeli.remove(index)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }
-        }
-    }
+            } // SAĞ ALT: CANLI ETKİNLİKLER Rectangle bitti
+        } // Sağ Sütun Column bitti (EKSİK OLAN BUYDU)
+    } // anaGörünümA Row bitti
+
 
     // ==========================================================
     // 5. GÖRÜNÜM B: SOHBET (CHAT) EKRANI
@@ -2612,12 +2758,7 @@ ApplicationWindow {
             var metin = girdiKutusu.text.trim()
             girdiKutusu.text = ""
             anaPencere.konusuyorMu = true
-            
-            chatModeli.append({ "gonderen": "kullanici", "mesaj": metin })
-            sohbeteMesajKaydet(anaPencere.aktifSohbetBaslik, "kullanici", metin)
-            chatListView.positionViewAtEnd()
-            
-            asistan.mesajGonder(metin)
+            asistan.mesajGonder(metin) // Mesajı ve geçmişi Python'dan gelen sinyal tek seferde ekleyecek
         }
     }
 
@@ -2641,7 +2782,12 @@ ApplicationWindow {
                 chatListView.positionViewAtEnd()
             }
         }
-
+        function onMetriklerGuncellendi(cpu, vram, audio, threads) {
+            metrikModeli.setProperty(0, "val", cpu)
+            metrikModeli.setProperty(1, "val", vram)
+            metrikModeli.setProperty(2, "val", audio)
+            metrikModeli.setProperty(3, "val", threads)
+        }
 
         function onDurumDegisti(durum) {
             if (durum === "dinliyor") {
@@ -2675,18 +2821,17 @@ ApplicationWindow {
         MenuItem { text: "⚙️ Gelişmiş Parametreler..."; font.pixelSize: 10; font.family: "Segoe UI" }
         MenuItem { text: "ℹ️ Aero AI Suite Hakkında"; font.pixelSize: 10; font.family: "Segoe UI" }
     }
-
-    // 2. HATIRLATICI EKLEME DİYALOĞU
+// 2. GELİŞMİŞ ETKİNLİK EKLEME DİYALOĞU
     Dialog {
         id: hatirlaticiEkleModal
         anchors.centerIn: parent
-        width: 320
-        height: 260
+        width: 340
+        height: miniTakvimGoster.visible ? 440 : 320
         modal: true
-        title: "Yeni Etkinlik / Hatırlatıcı Ekle"
+        title: "Yeni Etkinlik Oluştur"
 
         background: Rectangle {
-            color: Qt.rgba(0.06, 0.09, 0.14, 0.95)
+            color: Qt.rgba(0.06, 0.09, 0.14, 0.98)
             border.color: "#38bdf8"
             border.width: 1.5
             radius: 12
@@ -2695,42 +2840,133 @@ ApplicationWindow {
         Column {
             anchors.fill: parent
             anchors.margins: 12
-            spacing: 10
+            spacing: 8
 
-            Text { text: "Etkinlik Başlığı:"; color: "#ffffff"; font.pixelSize: 11; font.family: "Segoe UI" }
+            Text { text: "Etkinlik Başlığı:"; color: "#ffffff"; font.pixelSize: 10; font.family: "Segoe UI" }
             Rectangle {
-                width: parent.width; height: 30; radius: 4; color: Qt.rgba(0,0,0,0.5); border.color: Qt.rgba(1,1,1,0.3)
-                TextInput { id: modalBaslikGirdi; anchors.fill: parent; anchors.margins: 6; color: "#ffffff"; font.pixelSize: 11 }
+                width: parent.width; height: 28; radius: 4; color: Qt.rgba(0,0,0,0.5); border.color: Qt.rgba(1,1,1,0.2)
+                TextInput { id: modalBaslikGirdi; anchors.fill: parent; anchors.margins: 4; color: "#ffffff"; font.pixelSize: 11 }
             }
 
-            Text { text: "Tarih (GG.AA.YYYY):"; color: "#ffffff"; font.pixelSize: 11; font.family: "Segoe UI" }
+            Text { text: "Açıklama / Detay:"; color: "#ffffff"; font.pixelSize: 10; font.family: "Segoe UI" }
             Rectangle {
-                width: parent.width; height: 30; radius: 4; color: Qt.rgba(0,0,0,0.5); border.color: Qt.rgba(1,1,1,0.3)
-                TextInput { id: modalTarihGirdi; text: Qt.formatDate(new Date(), "dd.MM.yyyy"); anchors.fill: parent; anchors.margins: 6; color: "#ffffff"; font.pixelSize: 11 }
-            }
-
-            Text { text: "Saat (İsteğe Bağlı):"; color: "#ffffff"; font.pixelSize: 11; font.family: "Segoe UI" }
-            Rectangle {
-                width: parent.width; height: 30; radius: 4; color: Qt.rgba(0,0,0,0.5); border.color: Qt.rgba(1,1,1,0.3)
-                TextInput { id: modalSaatGirdi; text: "12:00"; anchors.fill: parent; anchors.margins: 6; color: "#ffffff"; font.pixelSize: 11 }
+                width: parent.width; height: 38; radius: 4; color: Qt.rgba(0,0,0,0.5); border.color: Qt.rgba(1,1,1,0.2)
+                TextInput { id: modalAciklamaGirdi; anchors.fill: parent; anchors.margins: 4; color: "#cbd5e1"; font.pixelSize: 10 }
             }
 
             Row {
+                width: parent.width
+                spacing: 8
+
+                Column {
+                    width: parent.width * 0.55
+                    spacing: 4
+                    Text { text: "Tarih:"; color: "#ffffff"; font.pixelSize: 10; font.family: "Segoe UI" }
+                    Row {
+                        spacing: 4
+                        Rectangle {
+                            width: 100; height: 28; radius: 4; color: Qt.rgba(0,0,0,0.5); border.color: Qt.rgba(1,1,1,0.2)
+                            TextInput { id: modalTarihGirdi; text: Qt.formatDate(new Date(), "dd.MM.yyyy"); anchors.fill: parent; anchors.margins: 4; color: "#ffffff"; font.pixelSize: 10 }
+                        }
+                        Rectangle {
+                            width: 28; height: 28; radius: 4; color: miniTakvimGoster.visible ? "#0284c7" : Qt.rgba(1,1,1,0.1)
+                            border.color: "#38bdf8"
+                            Text { text: "📅"; font.pixelSize: 11; anchors.centerIn: parent }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: miniTakvimGoster.visible = !miniTakvimGoster.visible
+                            }
+                        }
+                    }
+                }
+
+                Column {
+                    width: parent.width * 0.40
+                    spacing: 4
+                    Text { text: "Saat:"; color: "#ffffff"; font.pixelSize: 10; font.family: "Segoe UI" }
+                    Rectangle {
+                        width: parent.width; height: 28; radius: 4; color: Qt.rgba(0,0,0,0.5); border.color: Qt.rgba(1,1,1,0.2)
+                        TextInput { id: modalSaatGirdi; text: "14:00"; anchors.fill: parent; anchors.margins: 4; color: "#ffffff"; font.pixelSize: 10 }
+                    }
+                }
+            }
+
+            // AÇILIR KAPANIR MİNİ TAKVİM SEÇİCİ
+            Rectangle {
+                id: miniTakvimGoster
+                visible: false
+                width: parent.width
+                height: 110
+                radius: 6
+                color: Qt.rgba(0, 0, 0, 0.6)
+                border.color: "#38bdf8"
+
+                Column {
+                    anchors.fill: parent
+                    anchors.margins: 4
+                    spacing: 3
+
+                    Text {
+                        text: Qt.formatDate(new Date(), "MMMM yyyy").toUpperCase()
+                        color: "#38bdf8"
+                        font.pixelSize: 9
+                        font.bold: true
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+
+                    Grid {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        columns: 7
+                        spacing: 8
+
+                        Repeater {
+                            model: 31
+                            Rectangle {
+                                width: 14; height: 14; radius: 2
+                                color: (modalTarihGirdi.text.indexOf((index + 1) < 10 ? "0" + (index + 1) : "" + (index + 1)) === 0) ? "#0284c7" : (mHov.containsMouse ? Qt.rgba(1,1,1,0.2) : "transparent")
+                                Text { text: index + 1; color: "#ffffff"; font.pixelSize: 8; anchors.centerIn: parent }
+                                MouseArea {
+                                    id: mHov
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        var gun = (index + 1) < 10 ? "0" + (index + 1) : (index + 1)
+                                        var ayYil = Qt.formatDate(new Date(), ".MM.yyyy")
+                                        modalTarihGirdi.text = gun + ayYil
+                                        miniTakvimGoster.visible = false
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // KAYDET / İPTAL BUTONLARI
+            Row {
                 anchors.horizontalCenter: parent.horizontalCenter
                 spacing: 12
+                topPadding: 4
+
                 Rectangle {
-                    width: 90; height: 28; radius: 4; color: "#0284c7"
-                    Text { text: "Kaydet"; color: "#ffffff"; font.bold: true; font.pixelSize: 11; anchors.centerIn: parent }
+                    width: 90; height: 26; radius: 4; color: "#0284c7"
+                    Text { text: "Kaydet"; color: "#ffffff"; font.bold: true; font.pixelSize: 10; anchors.centerIn: parent }
                     MouseArea {
                         anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             if (modalBaslikGirdi.text.trim() !== "") {
                                 hatirlaticiModeli.append({
                                     "baslik": modalBaslikGirdi.text.trim(),
+                                    "aciklama": modalAciklamaGirdi.text.trim(),
                                     "tarih": modalTarihGirdi.text.trim(),
                                     "saat": modalSaatGirdi.text.trim()
                                 })
                                 modalBaslikGirdi.text = ""
+                                modalAciklamaGirdi.text = ""
+                                miniTakvimGoster.visible = false
                                 hatirlaticiEkleModal.close()
                             }
                         }
@@ -2738,11 +2974,18 @@ ApplicationWindow {
                 }
 
                 Rectangle {
-                    width: 90; height: 28; radius: 4; color: "#334155"
-                    Text { text: "İptal"; color: "#ffffff"; font.pixelSize: 11; anchors.centerIn: parent }
-                    MouseArea { anchors.fill: parent; onClicked: hatirlaticiEkleModal.close() }
+                    width: 90; height: 26; radius: 4; color: "#334155"
+                    Text { text: "İptal"; color: "#ffffff"; font.pixelSize: 10; anchors.centerIn: parent }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            miniTakvimGoster.visible = false
+                            hatirlaticiEkleModal.close()
+                        }
+                    }
                 }
             }
         }
     }
-}
+} // ApplicationWindow kök parantezi

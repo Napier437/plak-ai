@@ -6,6 +6,9 @@ import queue
 import threading
 import io
 import wave
+import psutil
+import subprocess
+import time
 from pathlib import Path
 import requests
 import torch
@@ -28,7 +31,7 @@ OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
 MODEL_NAME = "hizli-asistan"
 
 # --- GROQ API ---
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_API_KEY = ""
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY.startswith("gsk_") else None
 
 # --- META MMS-TTS MODELİ ---
@@ -57,7 +60,32 @@ class AsistanKoprusu(QObject):
     duvarKagidiDegisti = Signal()
     modDegisti = Signal()
     ttsModDegisti = Signal()
+    metriklerGuncellendi = Signal(float, float, float, float) # cpu, ram_veya_vram, audio, threads
 
+    def __init__(self):
+        super().__init__()
+        # ... Mevcut kodların ...
+        self._metrik_timer_baslat()
+
+    def _metrik_timer_baslat(self):
+        def loop():
+            while True:
+                time.sleep(2)
+                cpu = psutil.cpu_percent() / 100.0
+                threads = min(1.0, len(psutil.Process().threads()) / 20.0)
+                
+                # VRAM okumayı dene (nvidia-smi), yoksa RAM yüzdesi al
+                vram_val = 0.5
+                try:
+                    out = subprocess.check_output(["nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,nounits,noheader"]).decode()
+                    used, total = map(float, out.strip().split(","))
+                    vram_val = used / total
+                except Exception:
+                    vram_val = psutil.virtual_memory().percent / 100.0
+
+                self.metriklerGuncellendi.emit(cpu, vram_val, 0.35, threads)
+
+        threading.Thread(target=loop, daemon=True).start()
     def __init__(self):
         super().__init__()
         klasor = Path.home() / "Masaüstü" / "my wallpaper trials"
@@ -80,17 +108,16 @@ class AsistanKoprusu(QObject):
 # _piper_mod yerine 3 durumlu tts modu (0: Piper, 1: Meta, 2: Sessiz)
         self._tts_mod = 0  # 0: Piper, 1: Meta, 2: Sessiz/Mute
 
-    @Property(int, notify=ttsModDegisti)
-    def ttsMod(self):
-        return self._tts_mod
+    @Property(bool, notify=modDegisti)
+    def onlineMod(self):
+        return self._online_mod
 
-    @ttsMod.setter
-    def ttsMod(self, val):
-        if self._tts_mod != val:
-            self._tts_mod = val
-            self.ttsModDegisti.emit()
-            durumlar = ["PIPER (Ultra Hızlı)", "META MMS (Doğal)", "SESSİZ (Mute)"]
-            print(f"[TTS Motoru]: {durumlar[val]}")
+    @onlineMod.setter
+    def onlineMod(self, val):
+        if self._online_mod != val:
+            self._online_mod = val
+            self.modDegisti.emit()
+            print(f"[STT Modu]: {'ONLINE (Groq Cloud)' if val else 'OFFLINE (Yerel Whisper)'}")
 
     # _llm_sorgula içinde ses kuyruğuna atarken:
     # if self._tts_mod != 2:

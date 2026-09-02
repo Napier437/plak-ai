@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 380" width="380" height="380">
+  <defs>
+    <!-- Krom Dış Çerçeve Gradyanı -->
+    <linearGradient id="chromeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="20%" stop-color="#64748b"/>
+      <stop offset="45%" stop-color="#cbd5e1"/>
+      <stop offset="70%" stop-color="#1e293b"/>
+      <stop offset="90%" stop-color="#94a3b8"/>
+      <stop offset="100%" stop-color="#ffffff"/>
+    </linearGradient>
+
+    <!-- Gökkuşağı Hologram CD Gradyanı -->
+    <linearGradient id="rainbowGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ff2a2a"/>
+      <stop offset="18%" stop-color="#ffcc00"/>
+      <stop offset="38%" stop-color="#00e676"/>
+      <stop offset="62%" stop-color="#00d4ff"/>
+      <stop offset="80%" stop-color="#2979ff"/>
+      <stop offset="92%" stop-color="#e0e7ff"/>
+      <stop offset="100%" stop-color="#ff2a2a"/>
+    </linearGradient>
+
+    <!-- Parlama Çapraz Bant Gradyanı -->
+    <linearGradient id="flareGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="white" stop-opacity="0"/>
+      <stop offset="50%" stop-color="white" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Üst Cam Yansıma Gradyanı -->
+    <linearGradient id="glassGloss" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="white" stop-opacity="0.7"/>
+      <stop offset="35%" stop-color="white" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Arka Çapraz Cam Kanatlar -->
+  <g transform="translate(190,190)">
+    <rect x="-183" y="-73" width="366" height="146" rx="73" transform="rotate(45)" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.8)" stroke-width="1.8"/>
+    <rect x="-183" y="-73" width="366" height="146" rx="73" transform="rotate(-45)" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.8)" stroke-width="1.8"/>
+  </g>
+
+  <!-- Dış Krom Halka -->
+  <circle cx="190" cy="190" r="173" fill="url(#chromeGrad)" stroke="rgba(255,255,255,0.95)" stroke-width="2.5"/>
+  <circle cx="190" cy="190" r="170" fill="none" stroke="rgba(0,0,0,0.75)" stroke-width="2"/>
+
+  <!-- Vinil Gövde -->
+  <circle cx="190" cy="190" r="161" fill="#050608" stroke="#181a1f" stroke-width="1.2"/>
+
+  <!-- Vinil Ses Kanalları (Grooves) -->
+  <g fill="none" stroke-width="1.2">
+    <circle cx="190" cy="190" r="156" stroke="rgba(255,255,255,0.07)"/>
+    <circle cx="190" cy="190" r="150" stroke="rgba(0,0,0,0.95)"/>
+    <circle cx="190" cy="190" r="145" stroke="rgba(255,255,255,0.07)"/>
+    <circle cx="190" cy="190" r="139" stroke="rgba(0,0,0,0.95)"/>
+    <circle cx="190" cy="190" r="134" stroke="rgba(255,255,255,0.07)"/>
+    <circle cx="190" cy="190" r="128" stroke="rgba(0,0,0,0.95)"/>
+    <circle cx="190" cy="190" r="123" stroke="rgba(255,255,255,0.07)"/>
+    <circle cx="190" cy="190" r="117" stroke="rgba(0,0,0,0.95)"/>
+    <circle cx="190" cy="190" r="112" stroke="rgba(255,255,255,0.07)"/>
+    <circle cx="190" cy="190" r="106" stroke="rgba(0,0,0,0.95)"/>
+  </g>
+
+  <!-- Dönen Hologram CD Katmanı -->
+  <circle cx="190" cy="190" r="103" fill="url(#rainbowGrad)"/>
+
+  <!-- CD Üzerindeki X Parlama Işıkları -->
+  <g transform="translate(190,190)">
+    <rect x="-103" y="-24" width="206" height="48" rx="14" transform="rotate(45)" fill="url(#flareGrad)"/>
+    <rect x="-103" y="-24" width="206" height="48" rx="14" transform="rotate(-45)" fill="url(#flareGrad)"/>
+  </g>
+
+  <!-- Orta Şeffaf Halka -->
+  <circle cx="190" cy="190" r="45" fill="rgba(38,64,89,0.5)" stroke="rgba(255,255,255,0.85)" stroke-width="2.2"/>
+
+  <!-- Merkez Mil Göbeği -->
+  <circle cx="190" cy="190" r="22" fill="#334155" stroke="#ffffff" stroke-width="2"/>
+  <circle cx="190" cy="190" r="10" fill="#090d16"/>
+
+  <!-- Üst Cam Yansıma Maskesi -->
+  <path d="M 29,190 A 161,161 0 0,1 351,190 Z" fill="url(#glassGloss)"/>
+</svg>
