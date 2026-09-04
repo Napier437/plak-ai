@@ -19,6 +19,10 @@ from transformers import VitsModel, AutoTokenizer
 from faster_whisper import WhisperModel
 from groq import Groq
 from piper.voice import PiperVoice
+from dotenv import load_dotenv
+
+# .env dosyasındaki değişkenleri otomatik sisteme yükler
+load_dotenv()
 
 os.environ["QT_QUICK_CONTROLS_STYLE"] = "Basic"
 torch.set_num_threads(os.cpu_count() or 4)
@@ -27,11 +31,11 @@ from PySide6.QtCore import QObject, Signal, Slot, Property
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
-OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
+OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
 MODEL_NAME = "hizli-asistan"
 
 # --- GROQ API ---
-GROQ_API_KEY = ""
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY.startswith("gsk_") else None
 
 # --- META MMS-TTS MODELİ ---
@@ -50,7 +54,7 @@ if os.path.exists(piper_model_path) and os.path.exists(piper_config_path):
 
 # --- YEREL WHISPER ---
 stt_model = WhisperModel("large-v3-turbo", device="cpu", compute_type="int8", cpu_threads=os.cpu_count() or 4)
-
+SOHBETLER_DOSYASI = Path.home() / ".plak_ai_sohbetler.json"
 
 class AsistanKoprusu(QObject):
     cevapGeldi = Signal(str)
@@ -61,7 +65,7 @@ class AsistanKoprusu(QObject):
     modDegisti = Signal()
     ttsModDegisti = Signal()
     metriklerGuncellendi = Signal(float, float, float, float) # cpu, ram_veya_vram, audio, threads
-
+    gecmisYuklendi = Signal(str) # QML'e JSON aktarımı için
     def __init__(self):
         super().__init__()
         # ... Mevcut kodların ...
@@ -88,6 +92,14 @@ class AsistanKoprusu(QObject):
         threading.Thread(target=loop, daemon=True).start()
     def __init__(self):
         super().__init__()
+        # Sisteme asistan kimliği veriyoruz:
+        self._tum_sohbetler = self._diskten_sohbetleri_oku()
+        self._aktif_sohbet_id = "Sohbet 1"
+        if "Sohbet 1" not in self._tum_sohbetler:
+            self._tum_sohbetler["Sohbet 1"] = []
+        self._mesaj_gecmisi = [
+            {"role": "system", "content": "Sen Plak! AI adında, Türkçe konuşan, esprili, samimi, pratik ve doğrudan yanıt veren bir masaüstü asistanısın."}
+        ]
         klasor = Path.home() / "Masaüstü" / "my wallpaper trials"
         gecerli_uzantilar = {".jpg", ".jpeg", ".png", ".webp"}
 
@@ -168,6 +180,11 @@ class AsistanKoprusu(QObject):
 
         self._stream = sd.InputStream(samplerate=16000, channels=1, dtype="float32", callback=callback)
         self._stream.start()
+    @Slot()
+    def sohbetiSifirla(self):
+        self._mesaj_gecmisi = [
+            {"role": "system", "content": "Sen Plak! AI adında, Türkçe konuşan, esprili, samimi, pratik ve doğrudan yanıt veren bir masaüstü asistanısın."}
+        ]
 
     @Slot()
     def basKonusBitir(self):
@@ -251,13 +268,46 @@ class AsistanKoprusu(QObject):
         except Exception as e:
             print(f"Parça sentez hatası: {e}")
 
+
+    def _diskten_sohbetleri_oku(self):
+        if SOHBETLER_DOSYASI.exists():
+            try:
+                with open(SOHBETLER_DOSYASI, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"[Hafıza Hatası]: {e}")
+        return {}
+
+    def _diske_kaydet(self):
+        try:
+            with open(SOHBETLER_DOSYASI, "w", encoding="utf-8") as f:
+                json.dump(self._tum_sohbetler, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"[Kayıt Hatası]: {e}")
+
+    @Slot(str)
+    def aktifSohbetiDegistir(self, sohbet_baslik):
+        self._aktif_sohbet_id = sohbet_baslik
+        if sohbet_baslik not in self._tum_sohbetler:
+            self._tum_sohbetler[sohbet_baslik] = []
+
+    @Slot(result=str)
+    def sohbetleriGetirJson(self):
+        return json.dumps(self._tum_sohbetler, ensure_ascii=False)
+
     def _llm_sorgula(self, prompt):
         try:
+            # Kullanıcının mesajını geçmişe ekle
+            self._mesaj_gecmisi.append({"role": "user", "content": prompt})
+
             payload = {
                 "model": MODEL_NAME,
-                "prompt": prompt,
+                "messages": self._mesaj_gecmisi,
                 "stream": True,
-                "options": {"temperature": 0.7, "num_ctx": 4096}
+                "options": {
+                    "temperature": 0.7,
+                    "num_ctx": 32768  # Donanımı boğmadan geniş bir hafıza penceresi
+                }
             }
             response = requests.post(OLLAMA_URL, json=payload, stream=True, timeout=60)
 
@@ -284,20 +334,22 @@ class AsistanKoprusu(QObject):
             for line in response.iter_lines():
                 if line:
                     chunk = json.loads(line.decode("utf-8"))
-                    kelime = chunk.get("response", "")
+                    # /api/chat formatında parça 'message' -> 'content' içinde gelir
+                    kelime = chunk.get("message", {}).get("content", "")
                     tam_cevap += kelime
                     cumle_tamponu += kelime
 
                     self.mesajGuncelle.emit(tam_cevap)
 
-                    # --- GÜNCELLENEN YER (BURASI): Sadece Sessiz (2) Değilse Seslendir ---
                     if self._tts_mod != 2 and re.search(r'[.!?\n]', kelime) and len(cumle_tamponu.strip()) > 2:
                         self._cumleyi_kuyruga_at(cumle_tamponu.strip(), ses_kuyrugu)
                         cumle_tamponu = ""
 
-            # --- DÖNGÜ BİTİMİNDEKİ SON KONTROL ---
             if self._tts_mod != 2 and cumle_tamponu.strip():
                 self._cumleyi_kuyruga_at(cumle_tamponu.strip(), ses_kuyrugu)
+
+            # Asistanın verdiği cevabı da geçmişe kaydet ki bir dahaki sefere hatırlasın
+            self._mesaj_gecmisi.append({"role": "assistant", "content": tam_cevap})
 
             self.cevapGeldi.emit(tam_cevap)
             ses_kuyrugu.put(None)

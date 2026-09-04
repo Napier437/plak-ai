@@ -703,6 +703,7 @@ ApplicationWindow {
                     Rectangle { width: parent.width; height: 1; color: Qt.rgba(1, 1, 1, 0.15) }
 
                     // GERÇEK EKLENEN ETKİNLİKLER LİSTESİ
+// GERÇEK EKLENEN ETKİNLİKLER LİSTESİ
                     ScrollView {
                         width: parent.width
                         height: 75
@@ -718,27 +719,39 @@ ApplicationWindow {
                                 radius: 4
                                 color: Qt.rgba(1, 1, 1, 0.06)
 
-                                Row {
+                                // Row YERİNE Item KULLANILDI (721. satır çökmesini çözer)
+                                Item {
                                     anchors.fill: parent
                                     anchors.margins: 4
-                                    spacing: 6
-                                    Text { text: "📌"; font.pixelSize: 8; anchors.verticalCenter: parent.verticalCenter }
+
+                                    Text {
+                                        id: etkIkon1
+                                        text: "📌"
+                                        font.pixelSize: 8
+                                        anchors.left: parent.left
+                                        anchors.verticalCenter: parent.verticalCenter
+                                    }
+
                                     Text { 
                                         text: model.baslik
                                         color: "#ffffff"
                                         font.pixelSize: 9
                                         font.family: "Segoe UI"
+                                        anchors.left: etkIkon1.right
+                                        anchors.leftMargin: 6
+                                        anchors.right: etkSaat1.left
+                                        anchors.rightMargin: 6
                                         anchors.verticalCenter: parent.verticalCenter
                                         elide: Text.ElideRight
-                                        width: 140
                                     }
+
                                     Text {
+                                        id: etkSaat1
                                         text: model.saat ? model.saat : model.tarih
                                         color: "#38bdf8"
                                         font.pixelSize: 8
-                                        anchors.verticalCenter: parent.verticalCenter
                                         anchors.right: parent.right
-                                        anchors.rightMargin: 4
+                                        anchors.verticalCenter: parent.verticalCenter
                                     }
                                 }
                             }
