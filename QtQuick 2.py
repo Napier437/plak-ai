@@ -20,7 +20,9 @@ from faster_whisper import WhisperModel
 from groq import Groq
 from piper.voice import PiperVoice
 from dotenv import load_dotenv
-import difflib
+
+# Modüler araç yönlendiricimiz
+from tools import launcher, files
 
 # .env dosyasındaki değişkenleri otomatik sisteme yükler
 load_dotenv()
@@ -65,58 +67,8 @@ class AsistanKoprusu(QObject):
     duvarKagidiDegisti = Signal()
     modDegisti = Signal()
     ttsModDegisti = Signal()
-    metriklerGuncellendi = Signal(float, float, float, float) # cpu, ram_veya_vram, audio, threads
-    gecmisYuklendi = Signal(str) # QML'e JSON aktarımı için
-
-    def _arac_calistir(self, eylem, hedef, son_kullanici_mesaji=""):
-        # Model saçmalayıp hedefi boş geçerse veya geri_try derse
-        if not hedef or eylem == "geri_try":
-            hedef = son_kullanici_mesaji
-
-        uygulama_eslesmeleri = {
-            "dosya yöneticisi": "dolphin",
-            "klasör": "dolphin",
-            "klasörler": "dolphin",
-            "belgeler": "dolphin",
-            "terminal": "konsole",
-            "konsol": "konsole",
-            "bash": "konsole",
-            "tarayıcı": "firefox",
-            "internet": "firefox",
-            "google": "firefox",
-            "youtube": "firefox",
-            "hesap makinesi": "kcalc"
-        }
-
-        hedef_temiz = hedef.replace("_", " ").lower().strip()
-
-        # Doğrudan metin içinde anahtar kelime var mı bak (örn: "klasörlerimi görmek istiyorum")
-        komut = None
-        for anahtar, app_komut in uygulama_eslesmeleri.items():
-            if anahtar in hedef_temiz:
-                komut = app_komut
-                break
-
-        # Bulamadıysa fuzzy dene
-        if not komut:
-            eslesenler = difflib.get_close_matches(hedef_temiz, uygulama_eslesmeleri.keys(), n=1, cutoff=0.5)
-            if eslesenler:
-                komut = uygulama_eslesmeleri[eslesenler[0]]
-            else:
-                komut = hedef_temiz
-
-        try:
-            subprocess.Popen([komut])
-            print(f"[ARAÇ ÇALIŞTI]: {komut} arka planda fırlatıldı.")
-            return f"{komut} uygulamasını açtım."
-        except Exception as e:
-            print(f"[ARAÇ HATASI]: {e}")
-            return f"Uygulama başlatılamadı."
-        return ""
-            # örn: "hesap makinesi": "kcalc" (veya gnome-calculator/calc)
-            # "tarayıcı": "firefox"
-            # subprocess.Popen([komut]) ile arka planda pencereyi açtır
-
+    metriklerGuncellendi = Signal(float, float, float, float)
+    gecmisYuklendi = Signal(str)
 
     def _metrik_timer_baslat(self):
         def loop():
@@ -125,7 +77,6 @@ class AsistanKoprusu(QObject):
                 cpu = psutil.cpu_percent() / 100.0
                 threads = min(1.0, len(psutil.Process().threads()) / 20.0)
                 
-                # VRAM okumayı dene (nvidia-smi), yoksa RAM yüzdesi al
                 vram_val = 0.5
                 try:
                     out = subprocess.check_output(["nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,nounits,noheader"]).decode()
@@ -137,9 +88,9 @@ class AsistanKoprusu(QObject):
                 self.metriklerGuncellendi.emit(cpu, vram_val, 0.35, threads)
 
         threading.Thread(target=loop, daemon=True).start()
+
     def __init__(self):
         super().__init__()
-        # Sisteme asistan kimliği veriyoruz:
         self._tum_sohbetler = self._diskten_sohbetleri_oku()
         self._aktif_sohbet_id = "Sohbet 1"
         if "Sohbet 1" not in self._tum_sohbetler:
@@ -160,9 +111,7 @@ class AsistanKoprusu(QObject):
         
         self._online_mod = True
         self._piper_mod = True
-
-# _piper_mod yerine 3 durumlu tts modu (0: Piper, 1: Meta, 2: Sessiz)
-        self._tts_mod = 0  # 0: Piper, 1: Meta, 2: Sessiz/Mute
+        self._tts_mod = 0
 
     @Property(bool, notify=modDegisti)
     def onlineMod(self):
@@ -174,10 +123,6 @@ class AsistanKoprusu(QObject):
             self._online_mod = val
             self.modDegisti.emit()
             print(f"[STT Modu]: {'ONLINE (Groq Cloud)' if val else 'OFFLINE (Yerel Whisper)'}")
-
-    # _llm_sorgula içinde ses kuyruğuna atarken:
-    # if self._tts_mod != 2:
-    #     self._cumleyi_kuyruga_at(cumle_tamponu.strip(), ses_kuyrugu)
 
     @Property(bool, notify=ttsModDegisti)
     def piperMod(self):
@@ -224,6 +169,7 @@ class AsistanKoprusu(QObject):
 
         self._stream = sd.InputStream(samplerate=16000, channels=1, dtype="float32", callback=callback)
         self._stream.start()
+
     @Slot()
     def sohbetiSifirla(self):
         self._tum_sohbetler[self._aktif_sohbet_id] = []
@@ -279,9 +225,9 @@ class AsistanKoprusu(QObject):
             print(f"[Algılandı]: '{algilanan_metin}'")
 
             if algilanan_metin:
-                self.yeniMesajEkle.emit("user", algilanan_metin)
                 self.cevapGeldi.emit(f"Siz: {algilanan_metin}")
-                self._llm_sorgula(algilanan_metin)
+                # Doğrudan mesajGonder'e yönlendirerek niyet kontrolü ve araçları tetikle:
+                self.mesajGonder(algilanan_metin)
             else:
                 self.durumDegisti.emit("hazir")
         except Exception as e:
@@ -297,9 +243,9 @@ class AsistanKoprusu(QObject):
             if self._piper_mod and piper_voice:
                 wav_io = io.BytesIO()
                 with wave.open(wav_io, "wb") as wav_file:
-                    wav_file.setnchannels(1)        # 1 Kanal (Mono)
-                    wav_file.setsampwidth(2)        # 16-bit (2 byte)
-                    wav_file.setframerate(piper_voice.config.sample_rate) # Modelin frekansı
+                    wav_file.setnchannels(1)
+                    wav_file.setsampwidth(2)
+                    wav_file.setframerate(piper_voice.config.sample_rate)
                     piper_voice.synthesize_wav(temiz, wav_file)
                 wav_io.seek(0)
                 sr, data = scipy.io.wavfile.read(wav_io)
@@ -313,7 +259,6 @@ class AsistanKoprusu(QObject):
                 ses_kuyrugu.put((output[0].cpu().numpy(), tts_model.config.sampling_rate))
         except Exception as e:
             print(f"Parça sentez hatası: {e}")
-
 
     def _diskten_sohbetleri_oku(self):
         if SOHBETLER_DOSYASI.exists():
@@ -344,29 +289,31 @@ class AsistanKoprusu(QObject):
     def _llm_sorgula(self, prompt):
         seyyaptigimindegiskeni = """Sen Plak! AI masaüstü asistanısın.
 
-GÖREV: Kullanıcı bir uygulama açmanı veya sisteme erişmeni isterse BAŞKA HİÇBİR ŞEY YAZMADAN sadece bu JSON'ı üret:
-TOOL: {"eylem": "uygulama_ac", "hedef": "<uygulama_adi>"}
-Bunun için sadece ama sadece _arac_calistir() json yöntemini kullan.
-geri_try diye bir json yöntemi yok. bir daha denemek istiyorsan yine _arac_calistir() kullanacaksın.
-Kesin Kurallar:
-- "Açamam", "başlatılamadı", "kaynak yok" gibi bahaneler üretmek KESİNLİKLE YASAKTIR.
-- google/internet/youtube denirse hedef "tarayıcı" olsun.
-- dosya/klasör denirse hedef "dosya yöneticisi" olsun.
-- terminal/konsol denirse hedef "terminal" olsun.
-- Sohbet ediliyorsa normal Türkçe cevap ver."""
+GÖREV: Kullanıcı bir uygulama açmanı, bir klasöre girmesini veya bir dosya aramasını isterse YALNIZCA şu formatta tek satır çıktı üret:
+TOOL: {"eylem": "<eylem_turu>", "hedef": "<hedef>"}
+
+Eylem Türleri ve Hedefler:
+- Uygulamalar için -> eylem: "uygulama_ac", hedef: "terminal" / "tarayıcı" / "dosya yöneticisi" / "<uygulama_adi>"
+- Klasörler için -> eylem: "klasor_ac", hedef: "indirilenler" / "masaüstü" / "belgeler" / "resimler" / "ev"
+- Belirli dosyalar için -> eylem: "dosya_ac", hedef: "<dosya_adi.uzanti>"
+
+Kurallar:
+- Sistem komutlarında açıklama veya Markdown (```json) ASLA ekleme. Sadece TOOL ile başlayan satırı yaz.
+- Normal sohbetlerde doğal Türkçe yanıt ver."""
         try:
-            # Kullanıcının mesajını geçmişe ekle
             aktif_liste = self._tum_sohbetler.get(self._aktif_sohbet_id, [])
             aktif_liste.append({"role": "user", "content": prompt})
             gonderilecek_mesajlar = [
-            {"role": "system", "content":seyyaptigimindegiskeni}] + aktif_liste
+                {"role": "system", "content": seyyaptigimindegiskeni}
+            ] + aktif_liste
+
             payload = {
                 "model": MODEL_NAME,
                 "messages": gonderilecek_mesajlar,
                 "stream": True,
                 "options": {
                     "temperature": 0.2,
-                    "num_ctx": 32768  # Donanımı boğmadan geniş bir hafıza penceresi
+                    "num_ctx": 32768
                 }
             }
             response = requests.post(OLLAMA_URL, json=payload, stream=True, timeout=60)
@@ -394,7 +341,6 @@ Kesin Kurallar:
             for line in response.iter_lines():
                 if line:
                     chunk = json.loads(line.decode("utf-8"))
-                    # /api/chat formatında parça 'message' -> 'content' içinde gelir
                     kelime = chunk.get("message", {}).get("content", "")
                     tam_cevap += kelime
                     cumle_tamponu += kelime
@@ -404,10 +350,11 @@ Kesin Kurallar:
                     if "TOOL:" not in tam_cevap and self._tts_mod != 2 and re.search(r'[.!?\n]', kelime) and len(cumle_tamponu.strip()) > 2:
                         self._cumleyi_kuyruga_at(cumle_tamponu.strip(), ses_kuyrugu)
                         cumle_tamponu = ""
+
             print("--- MODELİN VERDİĞİ SAF CEVAP ---")
             print(tam_cevap)
             print("---------------------------------")
-            # DÖNGÜ BİTTİ: Araç kontrolü tam burada yapılır
+
             arac_metni = None
             if "TOOL:" in tam_cevap:
                 arac_metni = tam_cevap.split("TOOL:")[1].strip()
@@ -420,7 +367,8 @@ Kesin Kurallar:
                     eylem = veri.get("eylem")
                     hedef = veri.get("hedef")
 
-                    bildirim = self._arac_calistir(eylem, hedef)
+                    # Modüler launcher üzerinden çalıştırma
+                    bildirim = self._arac_yonetici(eylem, hedef)
                     if bildirim:
                         tam_cevap = bildirim
                         self.mesajGuncelle.emit(bildirim)
@@ -431,7 +379,6 @@ Kesin Kurallar:
             elif self._tts_mod != 2 and cumle_tamponu.strip():
                 self._cumleyi_kuyruga_at(cumle_tamponu.strip(), ses_kuyrugu)
 
-            # Asistanın verdiği cevabı da geçmişe kaydet ki bir dahaki sefere hatırlasın
             aktif_liste.append({"role": "assistant", "content": tam_cevap})
             self._tum_sohbetler[self._aktif_sohbet_id] = aktif_liste
             self._diske_kaydet()
@@ -446,53 +393,39 @@ Kesin Kurallar:
             self.mesajGuncelle.emit(f"Hata: {str(e)}")
             self.durumDegisti.emit("hazir")
 
-    def _niyet_kontrol(self, metin):
-        temiz = metin.lower().strip()
-        
-        # 1. Klasör / Dosya niyetleri
-        if any(kelime in temiz for kelime in ["klasör", "dosya", "belge"]):
-            if any(eylem in temiz for eylem in ["aç", "göster", "bak", "gör", "listele"]):
-                return "dosya yöneticisi"
-
-        # 2. Terminal niyetleri
-        if any(kelime in temiz for kelime in ["terminal", "konsol", "bash", "kod ekranı"]):
-            if any(eylem in temiz for eylem in ["aç", "başlat", "gir"]):
-                return "terminal"
-
-        # 3. İnternet / Tarayıcı niyetleri
-        if any(kelime in temiz for kelime in ["internet", "tarayıcı", "google", "youtube", "site"]):
-            if any(eylem in temiz for eylem in ["aç", "gir", "bağlan", "başlat"]):
-                return "tarayıcı"
-
-        # 4. Genel standart kalıp (... aç, ... başlat)
-        desen = r'(.*?)\s*(i|ı|u|ü|yi|yı|yu|yü)?\s*(aç|başlat|çalıştır|açsana|açar mısın)\b'
-        eslesme = re.search(desen, temiz)
-        if eslesme:
-            hedef = eslesme.group(1).strip()
-            return re.sub(r'(i|ı|u|ü|yi|yı|yu|yü)$', '', hedef).strip()
-
+    def _arac_yonetici(self, eylem, hedef):
+        """Eyleme göre işi uzman modülüne dağıtır."""
+        try:
+            if eylem == "uygulama_ac":
+                return launcher.uygulama_ac(hedef)
+            elif eylem == "klasor_ac":
+                return files.klasor_ac(hedef)
+            elif eylem == "dosya_ac":
+                return files.dosya_bul_ve_ac(hedef)
+        except Exception as e:
+            return f"Araç çalıştırma hatası: {e}"
         return None
 
+    # Tam burada, sınıfın içinde (4 boşluk girintili) olmalı:
     @Slot(str)
     def mesajGonder(self, metin):
         self.durumDegisti.emit("dinliyor")
         self.yeniMesajEkle.emit("user", metin)
 
-        # 1. Önce kapıdaki bekçiye sor: Bu bir sistem açma komutu mu?
-        hedef = self._niyet_kontrol(metin)
+        # Niyet kontrolü
+        sonuc = launcher.niyet_kontrol(metin)
 
-        if hedef:
-            # Sistem komutuysa LLM'e hiç gitme! Doğrudan aç.
-            bildirim = self._arac_calistir("uygulama_ac", hedef)
+        if sonuc and isinstance(sonuc, tuple) and len(sonuc) == 2:
+            eylem, hedef = sonuc
+            bildirim = self._arac_yonetici(eylem, hedef)
             if bildirim:
                 self.yeniMesajEkle.emit("asistan", bildirim)
                 self.cevapGeldi.emit(bildirim)
                 self.durumDegisti.emit("hazir")
                 return
 
-        # 2. Sistem komutu değilse (sohbetse) LLM'i uyandır
+        # Komut değilse sohbet için LLM
         threading.Thread(target=self._llm_sorgula, args=(metin,), daemon=True).start()
-
 
 if __name__ == "__main__":
     app = QGuiApplication(sys.argv)
